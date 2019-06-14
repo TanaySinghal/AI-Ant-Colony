@@ -22,10 +22,8 @@ def greedy_step(game_state, ant_team):
     return ac.apply_actions(game_state, actions)
 
 # This is basically our "game loop"
-init_game_state = ac.get_init()
 MAX_ROUND = 100
-
-game_state = init_game_state
+game_state = ac.get_init()
 while game_state.get_winner() is None:
     print(game_state.to_str())
     print()
