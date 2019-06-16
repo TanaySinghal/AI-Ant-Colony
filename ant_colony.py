@@ -27,7 +27,8 @@ class GameState:
         self.turn_number = turn_number
     
     def to_str(self):
-        board_str = "Round: " + str(self.turn_number)
+        team = "Red" if (self.turn_number % 2 == 0) else "Blue"
+        board_str = "Round: {} {}'s turn".format(str(self.turn_number),team)
         def cell_to_str(cell):
             if cell == Cell.EMPTY:
                 return '·' # NOTE: this is an interpunct and not a period
