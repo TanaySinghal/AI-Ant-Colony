@@ -1,5 +1,4 @@
 import ant_colony as ac
-import random
 
 REWARD_WEIGHT = 10  # Tendency to go after food
 RISK_WEIGHT = 1     # Tendency to avoid enemies
@@ -55,6 +54,11 @@ def greedy_step(game_state, ant_team):
         # and ant2 chooses to move to ant1's position)
         possible_steps = [step for step in all_steps if (step not in teammate_positions
                             and ac.inside_board(step) and not criss_cross(step))]
+
+        # TODO: FIX THIS
+        if len(possible_steps) == 0:
+            return at_coord
+        
         return min(possible_steps, key=lambda x:min_max_dist(x))
 
     # Define actions per ant

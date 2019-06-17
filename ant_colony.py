@@ -1,9 +1,9 @@
 import random
 from enum import IntEnum
 
-ROW, COL = 8, 8
-NUM_ANTS_PER_TEAM = COL
-FOOD_PROBABILITY = 0.3 # probability that a tile has food
+ROW, COL = 12, 8
+NUM_ANTS_PER_TEAM = 1
+FOOD_PROBABILITY = 0.15 # probability that a tile has food
 
 class Cell(IntEnum):
     EMPTY = 0
