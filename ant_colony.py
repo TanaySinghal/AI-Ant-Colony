@@ -94,10 +94,18 @@ def apply_actions(game_state, action_list):
             raise Exception("Attempted to perform action on cell (" + str(i) + "," + str(j) + ") of type " 
             + str(old_board[i][j]) + " but it is " + str(ant_team) + "'s turn")
 
-        # If there is food, leave old ant where it was and create new one 
-        if old_board[new_i][new_j] != Cell.FOOD:
-            new_board[i][j] = Cell.EMPTY
+        # If ant moves to food spawn food at team baseline
+        # If there is no space at baseline no new ant is spawned
+        if old_board[new_i][new_j] == Cell.FOOD:
+            for j in range(COL):
+                if ant_team == Cell.ANT_RED and new_board[0][j] == Cell.EMPTY:
+                    new_board[0][j] = ant_team
+                    break
+                elif ant_team == Cell.ANT_BLUE and new_board[ROW-1][COL-1-j] == Cell.EMPTY:
+                    new_board[ROW-1][COL-1-j] = ant_team
+                    break
 
+        new_board[i][j] = Cell.EMPTY
         new_board[new_i][new_j] = old_board[i][j]
 
     for (i, j, action) in action_list:
