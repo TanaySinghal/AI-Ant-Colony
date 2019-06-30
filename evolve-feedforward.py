@@ -6,7 +6,6 @@ import visualize
 from functools import reduce
 
 import ant_colony as ac
-from greedy import greedy_step
 from main import run_game, RANDOMIZE_FOOD
 
 GENERATIONS = 300 # How many generations to keep running
@@ -51,29 +50,32 @@ def neural_net_step_fn(neural_net):
 
     return neural_net_step
 
-# Determine fitness for a particular neural network
-def get_fitness(net):
+def get_fitness_food(net):
     neural_net_step = neural_net_step_fn(net)
-
     fitness = 0
-    N = 5 if RANDOMIZE_FOOD else 1
+    food_coords = set()
+    N = 1 if RANDOMIZE_FOOD else 1
     for _ in range(N):
-        end_game_state = run_game(greedy_step, neural_net_step)
+        end_game_state = run_game(neural_net_step)
         board = end_game_state.board
         for i in range(ac.ROW):
             for j in range(ac.COL):
-                if board[i][j] == ac.Cell.ANT_BLUE:
-                    fitness += 1
-                elif board[i][j] == ac.Cell.ANT_RED:
-                    fitness -= 1
-
-    return fitness / N
+                if board[i][j] == ac.Cell.ANT_RED:
+                    ant_coord = (i,j)
+                elif board[i][j] == ac.Cell.FOOD:
+                    food_coords.add((i,j))
+    if len(food_coords) == 0:
+        return 1
+    distance = 0
+    for food_coord in food_coords:
+        distance += ac.dist(ant_coord, food_coord)
+    return -1*distance
 
 # For each genome, calculate fitness
 def eval_genomes(genomes, config):
     for genome_id, genome in genomes:
         net = neat.nn.FeedForwardNetwork.create(genome, config)
-        genome.fitness = get_fitness(net)
+        genome.fitness = get_fitness_food(net)
 
 def run(config_file):
     # Load configuration.
@@ -98,18 +100,16 @@ def run(config_file):
     # Show output of the most fit genome against training data.
     print('\nOutput:')
     winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
-    print("Best fitness: ", get_fitness(winner_net))
+    print("Best fitness: ", get_fitness_food(winner_net))
 
     # Run a sample game with this net
     print("Sample game: \n")
     neural_net_step = neural_net_step_fn(winner_net)
-    states = run_game(greedy_step, neural_net_step, True)
+    states = run_game(neural_net_step, True)
     counter = 0
     for s in states:
-        if counter % 2 == 0:
-            print(s.to_str())
-            print()
-        counter += 1
+        print(s.to_str())
+        print()
 
     # node_names = {-1:'A', -2: 'B', 0:'A XOR B'}
     # visualize.draw_net(config, winner, True, node_names=node_names)

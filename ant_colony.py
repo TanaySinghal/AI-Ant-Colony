@@ -3,13 +3,12 @@ from enum import IntEnum
 
 ROW, COL = 12, 8
 NUM_ANTS_PER_TEAM = 1
-FOOD_PROBABILITY = 0.15 # probability that a tile has food
+AMOUNT_OF_FOOD = 1 # amount of food on board
 
 class Cell(IntEnum):
     EMPTY = 0
     FOOD = 1
     ANT_RED = 2
-    ANT_BLUE = 3
 
 class Action(IntEnum):
     NONE = 0
@@ -26,7 +25,7 @@ class GameState:
         self.turn_number = turn_number
     
     def to_str(self):
-        team = "Red" if (self.get_active_team() == Cell.ANT_RED) else "Blue"
+        team = "Red"
         board_str = "Round: {} {}'s turn".format(str(self.turn_number),team)
         def cell_to_str(cell):
             if cell == Cell.EMPTY:
@@ -41,47 +40,35 @@ class GameState:
         for row in self.board:
             board_str += '\n' + ''.join([cell_to_str(cell) for cell in row])
         return board_str
-    
-    # determine which team's turn it is
-    def get_active_team(self):
-        return Cell.ANT_RED if (self.turn_number % 2 == 0) else Cell.ANT_BLUE
 
-    # returns a winner if only one team remains alive
-    def get_winner(self):
-        blue_alive = False
-        red_alive = False
-
+    def food_left(self):
         for i in range(ROW):
             for j in range(COL):
-                if self.board[i][j] == Cell.ANT_BLUE:
-                    blue_alive = True
-                elif self.board[i][j] == Cell.ANT_RED:
-                    red_alive = True
-                    
-                if blue_alive and red_alive:
-                    return None
-
-        return Cell.ANT_RED if red_alive else Cell.ANT_BLUE
+                if self.board[i][j] == Cell.FOOD:
+                    return True
+        return False
 
 # Returns initial game state
 def get_init():
     board = [[Cell.EMPTY]*COL for x in [Cell.EMPTY]*ROW]
+    food_positions = set()
+    while  len(food_positions) < AMOUNT_OF_FOOD:
+        random_food_row = random.randrange(1, ROW)
+        random_food_col = random.randrange(1, COL)
+        food_positions.add((random_food_row, random_food_col))
+    for position in food_positions:
+        board[position[0]][position[1]] = Cell.FOOD
     for i in range(ROW):
         for j in range(COL):
             num = j + i*COL
             if num < NUM_ANTS_PER_TEAM:
                 board[i][j] = Cell.ANT_RED
-            elif num >= ROW*COL - NUM_ANTS_PER_TEAM:
-                board[i][j] = Cell.ANT_BLUE
-            elif random.random() < FOOD_PROBABILITY and 0 < i < ROW - 1:
-                board[i][j] = Cell.FOOD
     return GameState(board)
 
 # action_list is a list of (i, j, A). Perform action A at coordinate (i,j).
 # action_list must perform only one action per ant, 
 # and only for the ant team whose turn it is
 def apply_actions(game_state, action_list):
-    ant_team = game_state.get_active_team()
     old_board = game_state.board
     new_board = [row[:] for row in old_board]
 
@@ -90,14 +77,16 @@ def apply_actions(game_state, action_list):
             return
         if not inside_board((new_i, new_j)):
             return
-        if old_board[i][j] != ant_team:
-            raise Exception("Attempted to perform action on cell (" + str(i) + "," + str(j) + ") of type " 
-            + str(old_board[i][j]) + " but it is " + str(ant_team) + "'s turn")
 
-        # If there is food, leave old ant where it was and create new one 
-        if old_board[new_i][new_j] != Cell.FOOD:
-            new_board[i][j] = Cell.EMPTY
+        # If ant moves to food spawn food at team baseline
+        # If there is no space at baseline no new ant is spawned
+        if old_board[new_i][new_j] == Cell.FOOD:
+            for j in range(COL):
+                if new_board[0][j] == Cell.EMPTY:
+                    new_board[0][j] = Cell.ANT_RED
+                    break
 
+        new_board[i][j] = Cell.EMPTY
         new_board[new_i][new_j] = old_board[i][j]
 
     for (i, j, action) in action_list:
