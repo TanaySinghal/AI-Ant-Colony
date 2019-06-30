@@ -2,3 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Remove neat cache and results
+neat-checkpoint-*
+*.svg

@@ -1,10 +1,9 @@
 import random
 from enum import IntEnum
 
-ROW = 8
-COL = 8
-NUM_ANTS_PER_TEAM = COL
-FOOD_PROBABILITY = 0.3 # probability that a tile has food
+ROW, COL = 12, 8
+NUM_ANTS_PER_TEAM = 1
+FOOD_PROBABILITY = 0.15 # probability that a tile has food
 
 class Cell(IntEnum):
     EMPTY = 0
@@ -27,20 +26,26 @@ class GameState:
         self.turn_number = turn_number
     
     def to_str(self):
-        team = "Red" if (self.turn_number % 2 == 0) else "Blue"
+        team = "Red" if (self.get_active_team() == Cell.ANT_RED) else "Blue"
         board_str = "Round: {} {}'s turn".format(str(self.turn_number),team)
         def cell_to_str(cell):
             if cell == Cell.EMPTY:
                 return '·' # NOTE: this is an interpunct and not a period
             elif cell == Cell.FOOD:
-                return 'F'
+                return 'x'
+            elif cell == Cell.ANT_RED:
+                return 'R'
             else:
-                return str(int(cell))
+                return 'B'
 
         for row in self.board:
             board_str += '\n' + ''.join([cell_to_str(cell) for cell in row])
         return board_str
     
+    # determine which team's turn it is
+    def get_active_team(self):
+        return Cell.ANT_RED if (self.turn_number % 2 == 0) else Cell.ANT_BLUE
+
     # returns a winner if only one team remains alive
     def get_winner(self):
         blue_alive = False
@@ -68,7 +73,7 @@ def get_init():
                 board[i][j] = Cell.ANT_RED
             elif num >= ROW*COL - NUM_ANTS_PER_TEAM:
                 board[i][j] = Cell.ANT_BLUE
-            elif random.random() < FOOD_PROBABILITY and i < ROW - 1 and i > 0:
+            elif random.random() < FOOD_PROBABILITY and 0 < i < ROW - 1:
                 board[i][j] = Cell.FOOD
     return GameState(board)
 
@@ -76,16 +81,18 @@ def get_init():
 # action_list must perform only one action per ant, 
 # and only for the ant team whose turn it is
 def apply_actions(game_state, action_list):
-    # Determine whose turn it is
-    ant_team = (game_state.turn_number % 2) + Cell.ANT_RED
-
+    ant_team = game_state.get_active_team()
     old_board = game_state.board
     new_board = [row[:] for row in old_board]
 
     def move_ant(i, j, new_i, new_j):
+        if i == j and new_i == new_j:
+            return
+        if not inside_board((new_i, new_j)):
+            return
         if old_board[i][j] != ant_team:
             raise Exception("Attempted to perform action on cell (" + str(i) + "," + str(j) + ") of type " 
-            + str(old_board[i][j]) + " but it is " + str(Cell(ant_team)) + "'s turn")
+            + str(old_board[i][j]) + " but it is " + str(ant_team) + "'s turn")
 
         # If there is food, leave old ant where it was and create new one 
         if old_board[new_i][new_j] != Cell.FOOD:
@@ -93,25 +100,45 @@ def apply_actions(game_state, action_list):
 
         new_board[new_i][new_j] = old_board[i][j]
 
-    for (i, j, A) in action_list:
-        if A == Action.NONE:
-            continue
-        elif A == Action.LEFT:
-            if j > 0:
-                move_ant(i, j, i, j-1)
-        elif A == Action.UP:
-            if i > 0:
-                move_ant(i, j, i-1, j)
-        elif A == Action.RIGHT:
-            if j < COL - 1:
-                move_ant(i, j, i, j+1)
-        elif A == Action.DOWN:
-            if i < ROW - 1:
-                move_ant(i, j, i+1, j)
-        else:
-            raise Exception("Invalid action: ", A)
-
+    for (i, j, action) in action_list:
+        next_coord = action_to_coord(action, (i, j))
+        move_ant(i, j, next_coord[0], next_coord[1])
+        
     return GameState(new_board, game_state.turn_number + 1)
+
+def dist(coord1, coord2):
+    return (abs(coord1[1]-coord2[1]) + abs(coord1[0]-coord2[0]))
+
+def closest(coord, locations):
+    return None if not locations else min(locations,key=lambda x:dist(coord,x))
+
+def inside_board(coord):
+    return (0 <= coord[0] < ROW and 0 <= coord[1] < COL)
+    
+def action_to_coord(action, pos=(0,0)):
+    if action == Action.NONE:
+        return pos
+    elif action == Action.LEFT:
+        return (pos[0], pos[1]-1)
+    elif action == Action.RIGHT:
+        return (pos[0], pos[1]+1)
+    elif action == Action.UP:
+        return (pos[0]-1, pos[1])
+    elif action == Action.DOWN:
+        return (pos[0]+1, pos[1])
+    
+    raise Exception("Invalid action: ", action)
+
+def coord_to_action(from_coord, to_coord):
+    if from_coord[1]-to_coord[1] > 0:
+        return Action.LEFT
+    elif from_coord[1]-to_coord[1] < 0:
+        return Action.RIGHT
+    elif from_coord[0]-to_coord[0] > 0:
+        return Action.UP
+    elif from_coord[0]-to_coord[0] < 0:
+        return Action.DOWN
+    return Action.NONE
 
 # This is how the state works
 # game_state = get_init()
