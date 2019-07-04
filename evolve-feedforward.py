@@ -34,15 +34,21 @@ def neural_net_step_fn(neural_net):
         return reduce(lambda x,y :x+y, arr2d)
 
     def neural_net_step(game_state, ant_team):
+        food_locations = game_state.food_locations()
         board = game_state.board
         actions = []
+
         for i in range(ac.ROW):
             for j in range(ac.COL):
                 if board[i][j] == ant_team:
+                    # Since the neural net requires the same number of inputs
+                    # Add the food that's already been eaten to food_locations as the ants coord
+                    for _ in range(ac.AMOUNT_OF_FOOD - len(food_locations)):
+                        food_locations.insert(0, [i,j])
                     # One-hot encoding
                     # one_hot_arr = flatten([to_one_hot(x) for x in flatten(board)])
                     # output = neural_net.activate([i / ac.ROW, j / ac.COL] + one_hot_arr)
-                    output = neural_net.activate([i / ac.ROW, j / ac.COL] + flatten(board))
+                    output = neural_net.activate(list([i,j]) + flatten(food_locations))
                     action = argmax(output)
                     actions.append((i, j, action))
         

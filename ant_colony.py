@@ -3,7 +3,7 @@ from enum import IntEnum
 
 ROW, COL = 12, 8
 NUM_ANTS_PER_TEAM = 1
-AMOUNT_OF_FOOD = 1 # amount of food on board
+AMOUNT_OF_FOOD = 5 # amount of food on board
 
 class Cell(IntEnum):
     EMPTY = 0
@@ -47,6 +47,14 @@ class GameState:
                 if self.board[i][j] == Cell.FOOD:
                     return True
         return False
+
+    def food_locations(self):
+        food_locations = []
+        for i in range(ROW):
+            for j in range(COL):
+                if self.board[i][j] == Cell.FOOD:
+                    food_locations.append([i,j])
+        return food_locations
 
 # Returns initial game state
 def get_init():
