@@ -4,6 +4,7 @@ import neat
 import visualize
 
 from functools import reduce
+from joblib import Parallel, delayed # multithreading
 
 import ant_colony as ac
 from main import run_game, RANDOMIZE_FOOD
@@ -34,7 +35,8 @@ def neural_net_step_fn(neural_net):
         return reduce(lambda x,y :x+y, arr2d)
 
     def neural_net_step(game_state, ant_team):
-        food_locations = game_state.food_locations()
+        food_locations = game_state.food_locations()[0]
+        #print(food_locations)
         board = game_state.board
         actions = []
 
@@ -43,12 +45,13 @@ def neural_net_step_fn(neural_net):
                 if board[i][j] == ant_team:
                     # Since the neural net requires the same number of inputs
                     # Add the food that's already been eaten to food_locations as the ants coord
-                    for _ in range(ac.AMOUNT_OF_FOOD - len(food_locations)):
-                        food_locations.insert(0, [i,j])
+                    #for _ in range(ac.AMOUNT_OF_FOOD - len(food_locations)):
+                    #    food_locations.insert(0, [i,j])
                     # One-hot encoding
                     # one_hot_arr = flatten([to_one_hot(x) for x in flatten(board)])
                     # output = neural_net.activate([i / ac.ROW, j / ac.COL] + one_hot_arr)
-                    output = neural_net.activate(list([i,j]) + flatten(food_locations))
+                    #print([i, j] + food_locations)
+                    output = neural_net.activate([i, j] + food_locations)
                     action = argmax(output)
                     actions.append((i, j, action))
         
@@ -57,29 +60,38 @@ def neural_net_step_fn(neural_net):
     return neural_net_step
 
 def get_fitness_food(net):
-    neural_net_step = neural_net_step_fn(net)
-    fitness = 0
-    food_coords = set()
-    N = 1 if RANDOMIZE_FOOD else 1
-    for _ in range(N):
-        end_game_state = run_game(neural_net_step)
-        board = end_game_state.board
-        for i in range(ac.ROW):
-            for j in range(ac.COL):
-                if board[i][j] == ac.Cell.ANT_RED:
-                    ant_coord = (i,j)
-                elif board[i][j] == ac.Cell.FOOD:
-                    food_coords.add((i,j))
-    if len(food_coords) == 0:
-        return 1
-    distance = 0
-    for food_coord in food_coords:
-        distance += ac.dist(ant_coord, food_coord)
-    return -1*distance
+    trials = 5
+    def get_fitness(idx):
+        neural_net_step = neural_net_step_fn(net)
+        fitness = 0
+        food_coords = set()
+        N = 1 if RANDOMIZE_FOOD else 1
+        for _ in range(N):
+            end_game_state = run_game(neural_net_step)
+            board = end_game_state.board
+            for i in range(ac.ROW):
+                for j in range(ac.COL):
+                    if board[i][j] == ac.Cell.ANT_RED:
+                        ant_coord = (i,j)
+                    elif board[i][j] == ac.Cell.FOOD:
+                        food_coords.add((i,j))
+        if len(food_coords) == 0:
+            return 1
+        distance = 0
+        for food_coord in food_coords:
+            distance += ac.dist(ant_coord, food_coord)
+        return -1*distance
+    
+    fitness = Parallel(n_jobs=-1)(delayed(get_fitness)(i) for i in range(trials))
+    return sum(fitness) / trials
 
 # For each genome, calculate fitness
 def eval_genomes(genomes, config):
     for genome_id, genome in genomes:
+        # fitness = 0
+        # for _ in range(5):
+        #     net = neat.nn.FeedForwardNetwork.create(genome, config)
+        #     fitness += get_fitness_food(net)
         net = neat.nn.FeedForwardNetwork.create(genome, config)
         genome.fitness = get_fitness_food(net)
 

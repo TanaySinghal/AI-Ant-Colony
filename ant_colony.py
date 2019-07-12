@@ -3,7 +3,7 @@ from enum import IntEnum
 
 ROW, COL = 12, 8
 NUM_ANTS_PER_TEAM = 1
-AMOUNT_OF_FOOD = 5 # amount of food on board
+AMOUNT_OF_FOOD = 1 # amount of food on board
 
 class Cell(IntEnum):
     EMPTY = 0
