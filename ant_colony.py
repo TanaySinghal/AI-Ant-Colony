@@ -1,9 +1,9 @@
 import random
 from enum import IntEnum
 
-ROW, COL = 12, 8
+ROW, COL = 8, 8
 NUM_ANTS_PER_TEAM = 1
-FOOD_PROBABILITY = 0.15 # probability that a tile has food
+AMOUNT_OF_FOOD = 6
 
 class Cell(IntEnum):
     EMPTY = 0
@@ -27,10 +27,10 @@ class GameState:
     
     def to_str(self):
         team = "Red" if (self.get_active_team() == Cell.ANT_RED) else "Blue"
-        board_str = "Round: {} {}'s turn".format(str(self.turn_number),team)
+        board_str = "Round: {} {}'s turn".format(str(self.turn_number + 1),team)
         def cell_to_str(cell):
             if cell == Cell.EMPTY:
-                return '·' # NOTE: this is an interpunct and not a period
+                return '.' # NOTE: this is an interpunct and not a period
             elif cell == Cell.FOOD:
                 return 'x'
             elif cell == Cell.ANT_RED:
@@ -66,6 +66,15 @@ class GameState:
 # Returns initial game state
 def get_init():
     board = [[Cell.EMPTY]*COL for x in [Cell.EMPTY]*ROW]
+    food_positions = set()
+    while len(food_positions) <= AMOUNT_OF_FOOD/2:
+        random_food_row = random.randrange(1, ROW/2)
+        random_food_col = random.randrange(0, COL/2)
+        food_positions.add((random_food_row, random_food_col))
+    for position in food_positions:
+        board[position[0]][position[1]] = Cell.FOOD
+        board[ROW - 1 - position[0]][COL - 1 - position[1]] = Cell.FOOD
+    print("Food positions", food_positions)
     for i in range(ROW):
         for j in range(COL):
             num = j + i*COL
@@ -73,8 +82,6 @@ def get_init():
                 board[i][j] = Cell.ANT_RED
             elif num >= ROW*COL - NUM_ANTS_PER_TEAM:
                 board[i][j] = Cell.ANT_BLUE
-            elif random.random() < FOOD_PROBABILITY and 0 < i < ROW - 1:
-                board[i][j] = Cell.FOOD
     return GameState(board)
 
 # action_list is a list of (i, j, A). Perform action A at coordinate (i,j).
