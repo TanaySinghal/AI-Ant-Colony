@@ -1,4 +1,5 @@
 import ant_colony as ac
+from main import run_game
 
 REWARD_WEIGHT = 10  # Tendency to go after food
 RISK_WEIGHT = 1     # Tendency to avoid enemies
@@ -98,3 +99,7 @@ def greedy_step(game_state, ant_team):
         return ordered_actions
 
     return ac.apply_actions(game_state, order_actions(actions))
+
+# states = run_game(greedy_step, greedy_step, True)
+# for s in states:
+#     print(s)

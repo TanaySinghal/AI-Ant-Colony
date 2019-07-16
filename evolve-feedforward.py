@@ -32,7 +32,7 @@ def neural_net_step_fn(neural_net):
         return arr
 
     def flatten(arr2d):
-        return reduce(lambda x,y :x+y, arr2d)
+        return reduce(lambda x,y : x+y, arr2d)
 
     def neural_net_step(game_state, ant_team):
         board = game_state.board
@@ -107,7 +107,7 @@ def run(config_file):
     counter = 0
     for s in states:
         if counter % 2 == 0:
-            print(s.to_str())
+            print(s)
             print()
         counter += 1
 
