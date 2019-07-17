@@ -1,9 +1,9 @@
 import random
 from enum import IntEnum
 
-ROW, COL = 12, 8
+ROW, COL = 8, 8
 NUM_ANTS_PER_TEAM = 1
-AMOUNT_OF_FOOD = 1 # amount of food on board
+AMOUNT_OF_FOOD = 2 # amount of food on board
 
 class Cell(IntEnum):
     EMPTY = 0
@@ -53,19 +53,20 @@ class GameState:
         for i in range(ROW):
             for j in range(COL):
                 if self.board[i][j] == Cell.FOOD:
-                    food_locations.append([i,j])
+                    food_locations.append([i,j,1])
         return food_locations
 
 # Returns initial game state
 def get_init():
     board = [[Cell.EMPTY]*COL for x in [Cell.EMPTY]*ROW]
     food_positions = set()
-    while  len(food_positions) < AMOUNT_OF_FOOD:
-        random_food_row = random.randrange(1, ROW)
-        random_food_col = random.randrange(1, COL)
+    while len(food_positions) < AMOUNT_OF_FOOD/2:
+        random_food_row = random.randrange(1, ROW/2)
+        random_food_col = random.randrange(0, COL/2)
         food_positions.add((random_food_row, random_food_col))
     for position in food_positions:
         board[position[0]][position[1]] = Cell.FOOD
+        board[ROW - 1 - position[0]][COL - 1 - position[1]] = Cell.FOOD
     for i in range(ROW):
         for j in range(COL):
             num = j + i*COL
