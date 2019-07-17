@@ -23,23 +23,24 @@ def fitness(s):
 # Return a state
 def td_step_fn(theta, f_list, training = True):
   def td_step(s, ant_team):
-    action_list = ac.get_actions(s, ant_team)
+    action_list = ac.get_actions(s.board, ant_team)
     best_action_list = []
+    board = s.board
     for ant_actions in action_list:
-      
       best_utility = None
       best_action = None
-
+      best_board = None
       for action in ant_actions:
-        new_board = ac.apply_action_to_board(s, [action])
-        curr_utility = utility(ac.GameState(new_board, s.turn_number), theta, f_list)
-        if (best_utility is None) or (curr_utility > best_utility):
-          best_utility = curr_utility
+        new_board = ac.apply_action_to_board(board, [action])
+        new_utility = utility(ac.GameState(new_board, s.turn_number), theta, f_list)
+        if (best_utility is None) or (new_utility > best_utility):
+          best_utility = new_utility
           best_action = action
-
-      if best_action is not None:
-        best_action_list.append(best_action)
-
+          best_board = new_board
+      assert(best_action is not None)
+      best_action_list.append(best_action)
+      board = best_board
+    
     return ac.apply_actions(s, best_action_list)
   return td_step
 
@@ -61,7 +62,6 @@ def train(f_list, epochs, lr, gamma = 1):
   def compute_actual_utilities(s_list, gamma):
     N = len(s_list)
     u_list = [0] * N
-    # Note that u_list[0] = 0 always
     for i in range(N-1, -1, -1): # N-1 to 0 [Inclusive, exclusive)
       reward = fitness(s_list[i]) - fitness(s_list[i-1])
       if i == N-1:
@@ -71,7 +71,6 @@ def train(f_list, epochs, lr, gamma = 1):
     return u_list
     
   theta = (np.random.rand(M) - 0.5)*0.1
-  theta[0] = 0 # Start with 0 bias
 
   for epoch in range(epochs):
     s_list = run_game(td_step_fn(theta, f_list), greedy_step, True)
@@ -81,7 +80,6 @@ def train(f_list, epochs, lr, gamma = 1):
       theta = update_theta(s_list[i], actual_utilities[i], theta, lr)
     
     if epoch % 10 == 0:
-      # print(actual_utilities)
       err = (actual_utilities[0] - utility(s_list[0], theta, f_list))**2 / 2
       print(epoch, round(err, 3), end='\t')
       print("THETA:", end=' ')
@@ -202,7 +200,6 @@ def num_enemies(s):
             net_ants += 1
   return net_ants
 
-# TODO: Struggles with more features
 # f_list = [lambda s : 1, fitness, sum_dist_to_food, min_dist_to_food]
 f_list = [lambda s : 1, fitness, num_friends, num_enemies, sum_dist_to_food, min_dist_to_food]
 theta = train(f_list, 500, 1e-4, .9)

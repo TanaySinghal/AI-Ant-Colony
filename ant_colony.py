@@ -80,24 +80,23 @@ def get_init():
     return GameState(board)
 
 # Returns new ant coordinates, if valid
-def move_ant(i, j, state, action):
-    ant_team = state.get_active_team()
-    old_board = state.board
+def move_ant(i, j, board, action):
+    old_board = board
     new_i, new_j = action_to_coord(action, (i, j))
 
     if not inside_board((new_i, new_j)):
         return None
-    if old_board[i][j] != ant_team:
+    if old_board[i][j] != Cell.ANT_BLUE and old_board[i][j] != Cell.ANT_RED:
         raise Exception("Attempted to perform action on cell (" + str(i) + "," + str(j) + ") of type " 
-        + str(old_board[i][j]) + " but it is " + str(ant_team) + "'s turn")
+        + str(old_board[i][j]) + ".")
 
     return new_i, new_j
 
-def apply_action_to_board(state, action_list):
-    old_board = state.board
+def apply_action_to_board(board, action_list):
+    old_board = board
     new_board = [row[:] for row in old_board]
     for (i, j, action) in action_list:
-        new_coords = move_ant(i, j, state, action)
+        new_coords = move_ant(i, j, board, action)
         if new_coords is None:
             continue
         new_i, new_j = new_coords
@@ -114,21 +113,20 @@ def apply_action_to_board(state, action_list):
 # action_list must perform only one action per ant, 
 # and only for the ant team whose turn it is
 def apply_actions(state, action_list):
-    new_board = apply_action_to_board(state, action_list)
+    new_board = apply_action_to_board(state.board, action_list)
     return GameState(new_board, state.turn_number + 1)
 
 # Returns all possible actions for ants in ant_team
 # as a list of ant actions
-def get_actions(s, ant_team):
+def get_actions(board, ant_team):
     # Get actions for specific ant
     def get_actions_for_ant(i, j):
         ant_actions = []
         for action in range(len(Action)):
-            if move_ant(i, j, s, Action(action)) is not None:
+            if move_ant(i, j, board, Action(action)) is not None:
                 ant_actions.append((i, j, Action(action)))
         return ant_actions
 
-    board = s.board
     ant_actions_list = []
     for i in range(ROW):
         for j in range(COL):
