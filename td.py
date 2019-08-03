@@ -59,9 +59,12 @@ def train(f_list, epochs, lr, gamma = 1):
       theta_new[i] = theta[i] + lr * (actual_utility - expected_utility) * (f_list[i])(s)
     return theta_new
 
+  # TODO: Try using geometric series
   def compute_actual_utilities(s_list, gamma):
     N = len(s_list)
     u_list = [0] * N
+    # TODO: Idea: instead, of computing delta fitness, 
+    # just compute fitness at a particular state
     for i in range(N-1, -1, -1): # N-1 to 0 [Inclusive, exclusive)
       reward = fitness(s_list[i]) - fitness(s_list[i-1])
       if i == N-1:
@@ -69,7 +72,7 @@ def train(f_list, epochs, lr, gamma = 1):
       else:
         u_list[i] = reward + gamma * u_list[i+1]
     return u_list
-    
+
   theta = (np.random.rand(M) - 0.5)*0.1
 
   for epoch in range(epochs):
@@ -200,8 +203,17 @@ def num_enemies(s):
             net_ants += 1
   return net_ants
 
-# f_list = [lambda s : 1, fitness, sum_dist_to_food, min_dist_to_food]
-f_list = [lambda s : 1, fitness, num_friends, num_enemies, sum_dist_to_food, min_dist_to_food]
+def num_turns(s):
+  return s.turn_number
+
+# If we use this as a feature,
+# it should have 0 weight
+def random_val(s):
+  return random.random()
+
+# TODO: My intuition is that with some exploration we can better ignore random_val
+f_list = [lambda s : 1, fitness, sum_dist_to_food, min_dist_to_food]
+# f_list = [lambda s : 1, fitness, num_friends, num_enemies, sum_dist_to_food, min_dist_to_food, num_turns]
 theta = train(f_list, 500, 1e-4, .9)
 
 print("--- DONE TRAINING ---")
@@ -213,14 +225,17 @@ print()
 win = 0
 trials = 100
 saved = []
+avg_turns = 0
 for t in range(trials):
   states = run_game(td_step_fn(theta, f_list, False), greedy_step, True)
-  if states[len(states)-1].get_winner() == ac.Cell.ANT_RED:
+  end_state = states[len(states)-1]
+  if end_state.get_winner() == ac.Cell.ANT_RED:
     win += 1
+  avg_turns += end_state.turn_number
   if t == trials-1:
     saved = states
 print("Won: %d/%d" % (win, trials))
-
+print("Avg turns ", round(avg_turns/ trials, 3))
 if win > trials * (2/3):
   for s in saved:
     print(s)
