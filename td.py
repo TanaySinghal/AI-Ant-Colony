@@ -6,19 +6,23 @@ import random
 import math
 from functools import reduce
 
-def fitness(s):
+def fitness(s, ant_team):
   board = s.board
-  ant_team = s.get_active_team()
-  assert(ant_team == ac.Cell.ANT_RED)
+  #ant_team = s.get_active_team()
+  #assert(ant_team == ac.Cell.ANT_RED)
   net_ants = 0
+  opponent = ac.Cell.ANT_RED if ant_team == ac.Cell.ANT_BLUE else ac.Cell.ANT_BLUE
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ac.Cell.ANT_RED:
-            net_ants += 1
-          elif board[i][j] == ac.Cell.ANT_BLUE:
-            net_ants -= 1
+    for j in range(ac.COL):
+      if board[i][j] == ant_team:
+        net_ants += 1
+      elif board[i][j] == opponent:
+        net_ants -= 1
 
   return net_ants
+
+def opponent(ant_team):
+  return ac.Cell.ANT_RED if (ant_team == ac.Cell.ANT_BLUE) else ac.Cell.ANT_BLUE
 
 # Return a state
 def td_step_fn(theta, f_list, training = True):
@@ -32,7 +36,18 @@ def td_step_fn(theta, f_list, training = True):
       best_board = None
       for action in ant_actions:
         new_board = ac.apply_action_to_board(board, [action])
-        new_utility = utility(ac.GameState(new_board, s.turn_number), theta, f_list)
+        # Find best action for opponent in this board
+        enemy_action_list = ac.get_actions(new_board, opponent(ant_team))
+        for enemy_ant_actions in enemy_action_list:
+          enemy_best_utility = None
+          for enemy_action in enemy_ant_actions:
+            new_board_for_enemy = ac.apply_action_to_board(new_board, [enemy_action])
+            enemy_new_utility = utility(ac.GameState(new_board_for_enemy, s.turn_number+1), opponent(ant_team), theta, f_list)
+            if (enemy_best_utility is None) or (enemy_new_utility > enemy_best_utility):
+              enemy_best_utility = enemy_new_utility
+        assert(enemy_best_utility != None)
+        max_utility = utility(ac.GameState(new_board, s.turn_number), ant_team, theta, f_list)
+        new_utility = max_utility - enemy_best_utility
         if (best_utility is None) or (new_utility > best_utility):
           best_utility = new_utility
           best_action = action
@@ -44,19 +59,19 @@ def td_step_fn(theta, f_list, training = True):
     return ac.apply_actions(s, best_action_list)
   return td_step
 
-def utility(s, theta, f_list):
-  f_applied = np.array(list(map(lambda f: f(s), f_list)))
+def utility(s, ant_team, theta, f_list):
+  f_applied = np.array(list(map(lambda f: f(s, ant_team), f_list)))
   return np.dot(theta, f_applied)
 
 # Takes features, returns weights
-def train(f_list, epochs, lr, gamma = 1):
+def train(f_list, ant_team, epochs, lr, gamma = 1):
   M = len(f_list)
 
   def update_theta(s, actual_utility, theta, lr):
     theta_new = np.zeros(M)
-    expected_utility = utility(s, theta, f_list)
+    expected_utility = utility(s, ant_team, theta, f_list)
     for i in range(M):
-      theta_new[i] = theta[i] + lr * (actual_utility - expected_utility) * (f_list[i])(s)
+      theta_new[i] = theta[i] + lr * (actual_utility - expected_utility) * (f_list[i])(s, ant_team)
     return theta_new
 
   # TODO: Try using geometric series
@@ -66,7 +81,7 @@ def train(f_list, epochs, lr, gamma = 1):
     # TODO: Idea: instead, of computing delta fitness, 
     # just compute fitness at a particular state
     for i in range(N-1, -1, -1): # N-1 to 0 [Inclusive, exclusive)
-      reward = fitness(s_list[i]) - fitness(s_list[i-1])
+      reward = fitness(s_list[i], ant_team) - fitness(s_list[i-1], ant_team)
       if i == N-1:
         u_list[i] = reward
       else:
@@ -83,7 +98,7 @@ def train(f_list, epochs, lr, gamma = 1):
       theta = update_theta(s_list[i], actual_utilities[i], theta, lr)
     
     if epoch % 10 == 0:
-      err = (actual_utilities[0] - utility(s_list[0], theta, f_list))**2 / 2
+      err = (actual_utilities[0] - utility(s_list[0], ant_team, theta, f_list))**2 / 2
       print(epoch, round(err, 3), end='\t')
       print("THETA:", end=' ')
       for t in theta:
@@ -96,111 +111,111 @@ def train(f_list, epochs, lr, gamma = 1):
 def get_foods(board):
   food_list = []
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ac.Cell.FOOD:
-            food_list.append((i,j))
+    for j in range(ac.COL):
+      if board[i][j] == ac.Cell.FOOD:
+        food_list.append((i,j))
   return food_list
 
 # FEATURE FUNCTIONS
-def sum_dist_to_food(s):
+def sum_dist_to_food(s, ant_team):
   board = s.board
-  ant_team = s.get_active_team()
-  assert(ant_team == ac.Cell.ANT_RED)
+  #ant_team = s.get_active_team()
+  #assert(ant_team == ac.Cell.ANT_RED)
   
   food_list = get_foods(board)
   sum_dist = 0
   num_ants = 0
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ant_team:
-            num_ants += 1
-            for f in food_list:
-                sum_dist = sum_dist + ac.dist(f, (i,j)) / ac.ROW
+    for j in range(ac.COL):
+        if board[i][j] == ant_team:
+          num_ants += 1
+          for f in food_list:
+            sum_dist = sum_dist + ac.dist(f, (i,j)) / ac.ROW
   if num_ants > 0:
     return sum_dist / num_ants
   return sum_dist
 
-def min_dist_to_food(s):
+def min_dist_to_food(s, ant_team):
   board = s.board
-  ant_team = s.get_active_team()
-  assert(ant_team == ac.Cell.ANT_RED)
+  #ant_team = s.get_active_team()
+  #assert(ant_team == ac.Cell.ANT_RED)
   
   food_list = get_foods(board)
   min_dist = None
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ant_team:
-            for f in food_list:
-              if min_dist is None:
-                min_dist = ac.dist(f, (i,j)) / ac.ROW
-              else:
-                min_dist = min(min_dist, ac.dist(f, (i,j))) / ac.ROW
+    for j in range(ac.COL):
+      if board[i][j] == ant_team:
+        for f in food_list:
+          if min_dist is None:
+            min_dist = ac.dist(f, (i,j)) / ac.ROW
+          else:
+            min_dist = min(min_dist, ac.dist(f, (i,j))) / ac.ROW
   return 0 if min_dist is None else min_dist
 
-def near_enemy(s):
+def near_enemy(s, ant_team):
   board = s.board
-  ant_team = s.get_active_team()
-  assert(ant_team == ac.Cell.ANT_RED)
+  #ant_team = s.get_active_team()
+  #assert(ant_team == ac.Cell.ANT_RED)
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ant_team:
-            look_for = ac.Cell.ANT_BLUE
-            coords = [(i+1,j+1),(i+1,j-1),(i-1,j+1), (i-1,j-1)]
-            for coord in coords:
-              if ac.inside_board(coord) and board[coord[0]][coord[1]] == look_for:
-                return 1
+    for j in range(ac.COL):
+      if board[i][j] == ant_team:
+        look_for = ac.Cell.ANT_RED if (ant_team == ac.Cell.ANT_BLUE) else ac.Cell.ANT_BLUE
+        coords = [(i+1,j+1),(i+1,j-1),(i-1,j+1), (i-1,j-1)]
+        for coord in coords:
+          if ac.inside_board(coord) and board[coord[0]][coord[1]] == look_for:
+            return 1
   return 0
 
-def near_friend(s):
+def near_friend(s, ant_team):
   board = s.board
-  ant_team = s.get_active_team()
-  assert(ant_team == ac.Cell.ANT_RED)
+  #ant_team = s.get_active_team()
+  #assert(ant_team == ac.Cell.ANT_RED)
   ret_val = 0
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ant_team:
-            look_for = ant_team
-            coords = [(i+1,j+1),(i+1,j-1),(i-1,j+1), (i-1,j-1)]
-            for coord in coords:
-              if ac.inside_board(coord) and board[coord[0]][coord[1]] == look_for:
-                ret_val += 1
+    for j in range(ac.COL):
+      if board[i][j] == ant_team:
+        look_for = ant_team
+        coords = [(i+1,j+1),(i+1,j-1),(i-1,j+1), (i-1,j-1)]
+        for coord in coords:
+          if ac.inside_board(coord) and board[coord[0]][coord[1]] == look_for:
+            ret_val += 1
   return ret_val
 
-def near_food(s):
+def near_food(s, ant_team):
   board = s.board
-  ant_team = s.get_active_team()
-  assert(ant_team == ac.Cell.ANT_RED)
+  #ant_team = s.get_active_team()
+  #assert(ant_team == ac.Cell.ANT_RED)
   ret_val = 0
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ant_team:
-            look_for = ac.Cell.FOOD
-            coords = [(i+1,j+1),(i+1,j-1),(i-1,j+1), (i-1,j-1)]
-            for coord in coords:
-              if ac.inside_board(coord) and board[coord[0]][coord[1]] == look_for:
-                ret_val += 1
+    for j in range(ac.COL):
+      if board[i][j] == ant_team:
+        look_for = ac.Cell.FOOD
+        coords = [(i+1,j+1),(i+1,j-1),(i-1,j+1), (i-1,j-1)]
+        for coord in coords:
+          if ac.inside_board(coord) and board[coord[0]][coord[1]] == look_for:
+            ret_val += 1
   return ret_val
 
-def num_friends(s):
+def num_friends(s, ant_team):
   board = s.board
-  ant_team = s.get_active_team()
-  assert(ant_team == ac.Cell.ANT_RED)
+  #ant_team = s.get_active_team()
+  #assert(ant_team == ac.Cell.ANT_RED)
   net_ants = 0
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ac.Cell.ANT_RED:
-            net_ants += 1
+    for j in range(ac.COL):
+      if board[i][j] == ant_team:
+        net_ants += 1
   return net_ants
 
-def num_enemies(s):
+def num_enemies(s, ant_team):
   board = s.board
-  ant_team = s.get_active_team()
+  #ant_team = s.get_active_team()
   assert(ant_team == ac.Cell.ANT_RED)
   net_ants = 0
   for i in range(ac.ROW):
-      for j in range(ac.COL):
-          if board[i][j] == ac.Cell.ANT_BLUE:
-            net_ants += 1
+    for j in range(ac.COL):
+      if board[i][j] == ac.Cell.ANT_BLUE:
+        net_ants += 1
   return net_ants
 
 def num_turns(s):
@@ -212,9 +227,11 @@ def random_val(s):
   return random.random()
 
 # TODO: My intuition is that with some exploration we can better ignore random_val
-f_list = [lambda s : 1, fitness, sum_dist_to_food, min_dist_to_food]
+f_list = [lambda s, ant_team : 1, fitness, sum_dist_to_food, min_dist_to_food]
+ant_team = ac.Cell.ANT_RED
+#f_list = [lambda s : 1, num_friends, num_enemies]
 # f_list = [lambda s : 1, fitness, num_friends, num_enemies, sum_dist_to_food, min_dist_to_food, num_turns]
-theta = train(f_list, 500, 1e-4, .9)
+theta = train(f_list, ant_team, 500, 1e-4, .9)
 
 print("--- DONE TRAINING ---")
 print("THETA:", end=' ')
