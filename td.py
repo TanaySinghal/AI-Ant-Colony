@@ -25,13 +25,14 @@ def opponent(ant_team):
 # Return a state
 def td_step_fn(theta, f_list, training = True):
   # Find best utility not considering minimizing opponents moves 
-  def get_best_utility(s, ant_team):
-    action_list = ac.get_actions(s.board, ant_team)
-    best_utility = None
+  def get_best_utility(board, turn_number, ant_team):
+    action_list = ac.get_actions(board, ant_team)
+    # If there are no more ants we want the utility to be very negative
+    best_utility = None if len(action_list) != 0 else -10
     for ant_actions in action_list:
       for action in ant_actions:
-        new_board = ac.apply_action_to_board(s.board, [action])
-        new_utility = utility(ac.GameState(new_board, s.turn_number+1), ant_team, theta, f_list)
+        new_board = ac.apply_action_to_board(board, [action])
+        new_utility = utility(ac.GameState(new_board, turn_number+1), ant_team, theta, f_list)
         if (best_utility is None) or (new_utility > best_utility):
           best_utility = new_utility
     return best_utility
@@ -45,8 +46,8 @@ def td_step_fn(theta, f_list, training = True):
       best_board = None
       for action in ant_actions:
         new_board = ac.apply_action_to_board(board, [action])
-        enemy_best_utility = get_best_utility(s, opponent(ant_team))
-        assert(enemy_best_utility != None)
+        enemy_best_utility = get_best_utility(new_board, s.turn_number+1, opponent(ant_team))
+        assert(num_enemies(new_board, ant_team) == 0 or enemy_best_utility != None)
         max_utility = utility(ac.GameState(new_board, s.turn_number), ant_team, theta, f_list)
         new_utility = max_utility - enemy_best_utility
         if (best_utility is None) or (new_utility > best_utility):
@@ -194,12 +195,11 @@ def num_friends(s, ant_team):
         net_ants += 1
   return net_ants
 
-def num_enemies(s, ant_team):
-  board = s.board
+def num_enemies(board, ant_team):
   net_ants = 0
   for i in range(ac.ROW):
     for j in range(ac.COL):
-      if board[i][j] == ac.Cell.ANT_BLUE:
+      if board[i][j] == opponent(ant_team):
         net_ants += 1
   return net_ants
 
