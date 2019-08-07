@@ -23,42 +23,47 @@ def opponent(ant_team):
   return ac.Cell.ANT_RED if (ant_team == ac.Cell.ANT_BLUE) else ac.Cell.ANT_BLUE
 
 # Return a state
-def td_step_fn(theta, f_list, training = True):
+def td_step_fn(theta, f_list, minmax = False):
   # Find best utility not considering minimizing opponents moves 
   def get_best_utility(board, turn_number, ant_team):
-    action_list = ac.get_actions(board, ant_team)
-    # If there are no more ants we want the utility to be very negative
-    best_utility = None if len(action_list) != 0 else -10
-    for ant_actions in action_list:
-      for action in ant_actions:
-        new_board = ac.apply_action_to_board(board, [action])
-        new_utility = utility(ac.GameState(new_board, turn_number+1), ant_team, theta, f_list)
-        if (best_utility is None) or (new_utility > best_utility):
-          best_utility = new_utility
-    return best_utility
+    action_sets = ac.get_actions(board, ant_team)
+    # if len(action_sets) > 50000:
+    #     s = ac.GameState(board, 1)
+    #     print(s)
+    #     print("I'm taking a long time since I'm looking through", len(action_sets), "possible action sets")
+    best_utility = None
+    best_actions = None
+    for ant_actions in action_sets:
+      new_board = ac.apply_action_to_board(board, ant_actions)
+      new_utility = utility(ac.GameState(new_board, turn_number), ant_team, theta, f_list)
+      if (best_utility is None) or (new_utility > best_utility):
+        best_utility = new_utility
+        best_actions = ant_actions
+    # if there are no ants left, utility should be very negative
+    if len(action_sets) == 0: best_utility = -1
+    assert((best_actions is not None) or len(action_sets) == 0)
+    return best_utility, best_actions
+
   def td_step(s, ant_team):
-    action_list = ac.get_actions(s.board, ant_team)
-    best_action_list = []
-    board = s.board
-    for ant_actions in action_list:
+    if not minmax:
+      best_utility, best_actions = get_best_utility(s.board, s.turn_number, ant_team)
+      return ac.apply_actions(s, best_actions)
+    else:
+      action_sets = ac.get_actions(s.board, ant_team)
+      if len(action_sets) > 5000:
+          print("I'm taking a long time since I'm looking through", len(action_sets), "possible action sets")
       best_utility = None
-      best_action = None
-      best_board = None
-      for action in ant_actions:
-        new_board = ac.apply_action_to_board(board, [action])
-        enemy_best_utility = get_best_utility(new_board, s.turn_number+1, opponent(ant_team))
-        assert(num_enemies(new_board, ant_team) == 0 or enemy_best_utility != None)
+      best_actions = None
+      for ant_actions in action_sets: 
+        new_board = ac.apply_action_to_board(s.board, ant_actions)
         max_utility = utility(ac.GameState(new_board, s.turn_number), ant_team, theta, f_list)
+        enemy_best_utility, enemy_best_actions = get_best_utility(new_board, s.turn_number+1, opponent(ant_team))
+        assert(num_enemies(new_board, ant_team) == 0 or enemy_best_utility != None)
         new_utility = max_utility - enemy_best_utility
         if (best_utility is None) or (new_utility > best_utility):
           best_utility = new_utility
-          best_action = action
-          best_board = new_board
-      assert(best_action is not None)
-      best_action_list.append(best_action)
-      board = best_board
-    
-    return ac.apply_actions(s, best_action_list)
+          best_actions = ant_actions
+      return ac.apply_actions(s, best_actions)
   return td_step
 
 def utility(s, ant_team, theta, f_list):
@@ -214,7 +219,10 @@ def random_val(s):
 # TODO: My intuition is that with some exploration we can better ignore random_val
 f_list = [lambda s, ant_team : 1, fitness, sum_dist_to_food, min_dist_to_food]
 ant_team = ac.Cell.ANT_RED
-theta = train(f_list, ant_team, 500, 1e-4, .9)
+epoch = 500
+# theta = train(f_list, ant_team, epoch, 1e-4, .9)
+# theta = [0.24, 0.06, -0.03, 0.01]
+theta = train(f_list, ant_team, epoch, 1e-4, .9)
 
 print("--- DONE TRAINING ---")
 print("THETA:", end=' ')
@@ -227,7 +235,10 @@ trials = 100
 saved = []
 avg_turns = 0
 for t in range(trials):
-  states = run_game(td_step_fn(theta, f_list, False), greedy_step, True)
+  print("trial:", t)
+  # run the min max version of TD against the only-max version of TD
+  # td_step_fn(theta, f_list, True)
+  states = run_game(td_step_fn(theta, f_list), greedy_step, True)
   end_state = states[len(states)-1]
   if end_state.get_winner() == ac.Cell.ANT_RED:
     win += 1
@@ -236,6 +247,6 @@ for t in range(trials):
     saved = states
 print("Won: %d/%d" % (win, trials))
 print("Avg turns ", round(avg_turns/ trials, 3))
-if win > trials * (2/3):
-  for s in saved:
-    print(s)
+#if win > trials * (2/3):
+for s in saved:
+  print(s)

@@ -3,7 +3,8 @@ from enum import IntEnum
 
 ROW, COL = 8, 8
 NUM_ANTS_PER_TEAM = 2
-FOOD_PROBABILITY = 0.15 # probability that a tile has food
+FOOD_PROBABILITY = 0.15 # 0.15 probability that a tile has food
+AMOUNT_OF_FOOD = 4
 
 class Cell(IntEnum):
     EMPTY = 0
@@ -66,6 +67,7 @@ class GameState:
 # Returns initial game state
 def get_init():
     board = [[Cell.EMPTY]*COL for x in [Cell.EMPTY]*ROW]
+    food_added = 0
     for i in range(ROW):
         for j in range(COL):
             num = j + i*COL
@@ -73,10 +75,12 @@ def get_init():
                 board[i][j] = Cell.ANT_RED
             elif num >= ROW*COL - NUM_ANTS_PER_TEAM:
                 board[i][j] = Cell.ANT_BLUE
-            elif random.random() < FOOD_PROBABILITY and 0 < i < ROW/2:
+            elif random.random() < FOOD_PROBABILITY and 0 < i < ROW/2 and food_added < AMOUNT_OF_FOOD :
                 board[i][j] = Cell.FOOD
+                food_added += 1
             elif i >= ROW/2 and board[ROW-i-1][j] == Cell.FOOD:
                 board[i][COL-j-1] = Cell.FOOD
+                food_added += 1
     return GameState(board)
 
 # Returns new ant coordinates, if valid
@@ -93,20 +97,35 @@ def move_ant(i, j, board, action):
     return new_i, new_j
 
 def apply_action_to_board(board, action_list):
-    old_board = board
-    new_board = [row[:] for row in old_board]
-    for (i, j, action) in action_list:
-        new_coords = move_ant(i, j, board, action)
-        if new_coords is None:
-            continue
-        new_i, new_j = new_coords
+    ant_team = board[action_list[0][0]][action_list[0][1]]
 
-        # If there is food, leave old ant where it was and create new one 
-        if old_board[new_i][new_j] != Cell.FOOD:
-            new_board[i][j] = Cell.EMPTY
+    new_board = [row[:] for row in board]
 
-        new_board[new_i][new_j] = old_board[i][j]
+    for i in range(ROW):
+        for j in range(COL):
+            if board[i][j] == ant_team:
+                new_board[i][j] = Cell.EMPTY
     
+    for (i, j, action) in action_list:
+        new_i, new_j = action_to_coord(action, (i, j))
+
+        if not inside_board((new_i, new_j)):
+            raise Exception("Cannot move ant outside board")
+
+        # If ant moves to food spawn food at team baseline
+        # If there is no space at baseline no new ant is spawned
+        if board[new_i][new_j] == Cell.FOOD:
+            if ant_team == Cell.ANT_RED:
+                for j in range(COL):
+                    if new_board[0][j] != ant_team:
+                        new_board[0][j] = ant_team
+                        break
+            else:
+                for j in range(COL):
+                    if new_board[ROW-1][COL-1-j] != ant_team:
+                        new_board[ROW-1][COL-1-j] = ant_team
+                        break
+        new_board[new_i][new_j] = ant_team
     return new_board
 
 # action_list is a list of (i, j, A). Perform action A at coordinate (i,j).
@@ -132,8 +151,27 @@ def get_actions(board, ant_team):
         for j in range(COL):
             if board[i][j] == ant_team:
                 ant_actions_list.append(get_actions_for_ant(i, j))
+    return all_possible_action_sets(ant_actions_list)
 
-    return ant_actions_list
+def all_possible_action_sets(ant_actions_list):
+  if len(ant_actions_list) == 0:
+    return [[]]
+
+  # head is possible actions for ant 1
+  # tail is rest of ant_actions_list
+  possible_actions_ant1, *rest = ant_actions_list
+
+  # Gives all possible combinations without ant 1
+  rest_combinations = all_possible_action_sets(rest)
+
+  c = []
+  for action_ant1 in possible_actions_ant1:
+    # Add this action for ant 1 to each permutation
+    new_perm = []
+    for permutation in rest_combinations:
+      new_perm.append([action_ant1] + permutation)
+    c = c + new_perm
+  return c
 
 def dist(coord1, coord2):
     return abs(coord1[1]-coord2[1]) + abs(coord1[0]-coord2[0])
