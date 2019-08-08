@@ -217,36 +217,36 @@ def random_val(s):
   return random.random()
 
 # TODO: My intuition is that with some exploration we can better ignore random_val
-f_list = [lambda s, ant_team : 1, fitness, sum_dist_to_food, min_dist_to_food]
-ant_team = ac.Cell.ANT_RED
-epoch = 500
+# f_list = [lambda s, ant_team : 1, fitness, sum_dist_to_food, min_dist_to_food]
+# ant_team = ac.Cell.ANT_RED
+# epoch = 500
+# # theta = train(f_list, ant_team, epoch, 1e-4, .9)
+# # theta = [0.24, 0.06, -0.03, 0.01]
 # theta = train(f_list, ant_team, epoch, 1e-4, .9)
-# theta = [0.24, 0.06, -0.03, 0.01]
-theta = train(f_list, ant_team, epoch, 1e-4, .9)
 
-print("--- DONE TRAINING ---")
-print("THETA:", end=' ')
-for t in theta:
-  print(round(t, 2), end=' ')
-print()
+# print("--- DONE TRAINING ---")
+# print("THETA:", end=' ')
+# for t in theta:
+#   print(round(t, 2), end=' ')
+# print()
 
-win = 0
-trials = 100
-saved = []
-avg_turns = 0
-for t in range(trials):
-  print("trial:", t)
-  # run the min max version of TD against the only-max version of TD
-  # td_step_fn(theta, f_list, True)
-  states = run_game(td_step_fn(theta, f_list), greedy_step, True)
-  end_state = states[len(states)-1]
-  if end_state.get_winner() == ac.Cell.ANT_RED:
-    win += 1
-  avg_turns += end_state.turn_number
-  if t == trials-1:
-    saved = states
-print("Won: %d/%d" % (win, trials))
-print("Avg turns ", round(avg_turns/ trials, 3))
-#if win > trials * (2/3):
-for s in saved:
-  print(s)
+# win = 0
+# trials = 100
+# saved = []
+# avg_turns = 0
+# for t in range(trials):
+#   print("trial:", t)
+#   # run the min max version of TD against the only-max version of TD
+#   # td_step_fn(theta, f_list, True)
+#   states = run_game(td_step_fn(theta, f_list), greedy_step, True)
+#   end_state = states[len(states)-1]
+#   if end_state.get_winner() == ac.Cell.ANT_RED:
+#     win += 1
+#   avg_turns += end_state.turn_number
+#   if t == trials-1:
+#     saved = states
+# print("Won: %d/%d" % (win, trials))
+# print("Avg turns ", round(avg_turns/ trials, 3))
+# #if win > trials * (2/3):
+# for s in saved:
+#   print(s)
