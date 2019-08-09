@@ -137,7 +137,7 @@ def apply_actions(state, action_list):
 
 # Returns all possible actions for ants in ant_team
 # as a list of ant actions
-def get_actions(board, ant_team):
+def get_ant_actions(board, ant_team):
     # Get actions for specific ant
     def get_actions_for_ant(i, j):
         ant_actions = []
@@ -151,6 +151,10 @@ def get_actions(board, ant_team):
         for j in range(COL):
             if board[i][j] == ant_team:
                 ant_actions_list.append(get_actions_for_ant(i, j))
+    return ant_actions_list
+
+def get_actions(board, ant_team):
+    ant_actions_list = get_ant_actions(board, ant_team)
     return all_possible_action_sets(ant_actions_list)
 
 def all_possible_action_sets(ant_actions_list):

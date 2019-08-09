@@ -14,6 +14,27 @@ from td import td_step_fn as good_player_fn
 dtype = torch.float
 # device = torch.device("cpu")
 
+def init_model():
+  d_input = 256
+  d_h1 = 200
+  d_h2 = 160
+  d_h3 = 80
+  d_h4 = 15
+  d_out = 1
+
+  model = nn.Sequential(
+    nn.Linear(d_input, d_h1), # TODO: Sigmoid
+    nn.ReLU(),
+    nn.Linear(d_h1, d_h2),
+    nn.ReLU(),
+    nn.Linear(d_h2, d_h3),
+    nn.ReLU(),
+    nn.Linear(d_h3, d_h4),
+    nn.ReLU(),
+    nn.Linear(d_h4, d_out)
+  )
+  return model
+
 def fitness(s, ant_team):
   board = s.board
   net_ants = 0
@@ -39,10 +60,10 @@ def utility(board, model):
 
   # Do a one hot encoding
   flattened_board = flatten(board)
-  nn_input = torch.zeros(64 * 5, dtype=dtype)
+  nn_input = torch.zeros(64 * 4, dtype=dtype)
   for i in range(len(flattened_board)):
     c = flattened_board[i]
-    nn_input[5*i + c] = 1
+    nn_input[4*i + c] = 1
 
   # print(nn_input)
   return model(nn_input)
@@ -51,24 +72,27 @@ def utility(board, model):
 def td_nn_step_fn(model):
   # Find best utility not considering minimizing opponents moves 
   def get_best_utility(board, turn_number, ant_team):
-    action_sets = ac.get_actions(board, ant_team)
-    # if len(action_sets) > 50000:
-    #     s = ac.GameState(board, 1)
-    #     print(s)
-    #     print("I'm taking a long time since I'm looking through", len(action_sets), "possible action sets")
-    best_utility = None
-    best_actions = None
+    # returns ant action list
+    action_sets = ac.get_ant_actions(board, ant_team)
+
+    best_action_list = []
+    new_board = [row[:] for row in board]
     for ant_actions in action_sets:
-      new_board = ac.apply_action_to_board(board, ant_actions)
-      new_utility = utility(new_board, model)
-      if (best_utility is None) or (new_utility > best_utility):
-        best_utility = new_utility
-        best_actions = ant_actions
+      best_utility = None
+      best_action = None
+      for action in ant_actions:
+        new_board = ac.apply_action_to_board(new_board, [action])
+        new_utility = utility(new_board, model)
+        if (best_utility is None) or (new_utility > best_utility):
+          best_utility = new_utility
+          best_action = action
+          best_action_list.append(best_action)
+    
     # if there are no ants left, utility should be very negative
     if len(action_sets) == 0: 
       best_utility = -1
-    assert((best_actions is not None) or len(action_sets) == 0)
-    return best_utility, best_actions
+    assert(len(best_action_list) != 0 or len(action_sets) == 0)
+    return best_utility, best_action_list
 
   def td_step(s, ant_team):
     _, best_actions = get_best_utility(s.board, s.turn_number, ant_team)
@@ -94,39 +118,12 @@ def train(ant_team, good_player_step=None, good_player_percent=0, num_games=500,
         u_list[i] = reward + gamma * u_list[i+1]
     return u_list
 
-  # d_input = 64
-  # d_h1 = 50
-  # d_h2 = 30
-  # d_h3 = 15
-  d_input = 320
-  d_h1 = 200
-  d_h2 = 80
-  d_h3 = 15
-  d_out = 1
-
-  model = nn.Sequential(
-    nn.Linear(d_input, d_h1), # TODO: Sigmoid
-    nn.ReLU(),
-    nn.Linear(d_h1, d_h2),
-    nn.ReLU(),
-    nn.Linear(d_h2, d_h3),
-    nn.ReLU(),
-    nn.Linear(d_h3, d_out)
-  )
-
-  # model = nn.Sequential(
-  #   nn.Linear(d_input, d_h1), # TODO: Sigmoid
-  #   nn.ReLU(),
-  #   nn.Linear(d_h1, d_h3),
-  #   nn.ReLU(),
-  #   nn.Linear(d_h3, d_h4),
-  #   nn.ReLU(),
-  #   nn.Linear(d_h4, d_out)
-  # )
+  model = init_model()
 
   losses = []
   for game_i in range(num_games):
-    if good_player_step != None and random.random() < good_player_percent:
+    # if good_player_step != None and random.random() < good_player_percent:
+    if good_player_step != None and random.random() > (game_i / num_games)**2:
       # Run good player
       print("Good player")
       s_list = run_game(good_player_step, greedy_step, True)
@@ -212,24 +209,48 @@ f_list = [lambda s, ant_team : 1, fitness, sum_dist_to_food, min_dist_to_food]
 theta = [0.48, 0.22, -0.08, -0.02]
 
 # TODO: My intuition is that with some exploration we can better ignore random_val
-ant_team = ac.Cell.ANT_RED
-good_player_step = good_player_fn(theta, f_list)
+# ant_team = ac.Cell.ANT_RED
+# good_player_step = good_player_fn(theta, f_list)
 
-model, losses = train(ant_team, good_player_step=good_player_step, good_player_percent=1, num_games=300, epochs=50, lr=1e-4, gamma=1)
-# Save model
+# model, losses = train(ant_team, good_player_step=good_player_step, good_player_percent=0.5, num_games=300, epochs=50, lr=1e-4, gamma=1)
+# # Save model
+# import os
+# # dir_path = os.path.dirname(os.path.realpath(__file__))
+# # print(dir_path + "/saved_td_nn")
+# torch.save(model.state_dict(), os.path.join('saved_model', 'test_model.t7'))
+
+# print("--- DONE TRAINING ---")
+
+# for name, param in model.named_parameters():
+#   if param.requires_grad:
+#       print(name, param.data)
+
+
+# # Graph loss
+# print("PLOTTING")
+# import matplotlib.pyplot as plt
+# import matplotlib.ticker as ticker
+
+# plt.figure()
+
+# plt.title("TD NN Loss")
+# plt.xlabel("# Games")
+# plt.ylabel("Loss")
+# plt.ylim(0,1)
+# plt.plot(losses)
+# plt.show()
+
+# # Save losses
+# import numpy
+# a = numpy.asarray(losses)
+# numpy.savetxt("losses.csv", a, delimiter=",")
+
+model = init_model()
 import os
-# dir_path = os.path.dirname(os.path.realpath(__file__))
-# print(dir_path + "/saved_td_nn")
-torch.save(model.state_dict(), os.path.join('saved_model', 'test_model.t7'))
-
-print("--- DONE TRAINING ---")
-
-for name, param in model.named_parameters():
-  if param.requires_grad:
-      print(name, param.data)
+model.load_state_dict(torch.load(os.path.join('saved_model', 'test_model.t7')))
 
 win = 0
-trials = 10
+trials = 100
 saved = []
 avg_turns = 0
 for t in range(trials):
@@ -247,21 +268,3 @@ print("Avg turns ", round(avg_turns/ trials, 3))
 for s in saved:
   print(s)
 
-# Graph loss
-print("PLOTTING")
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-
-plt.figure()
-
-plt.title("TD NN Loss")
-plt.xlabel("# Games")
-plt.ylabel("Loss")
-plt.ylim(0,1)
-plt.plot(losses)
-plt.show()
-
-# Save losses
-import numpy
-a = numpy.asarray(losses)
-numpy.savetxt("losses.csv", a, delimiter=",")
